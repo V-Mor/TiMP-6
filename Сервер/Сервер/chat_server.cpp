@@ -152,8 +152,9 @@ private:
 	chat_participant_ptr findClient(const char* name)
 	{
 		for (auto client : room_.getParticipants())
-			if (!strcmp(((client.get())->participant_name), name))
+			if (!strcmp(((client)->participant_name), name))
 				return client;
+		return nullptr;
 	}
 
 	void do_read_header()
@@ -204,16 +205,27 @@ private:
 				if (!strncmp(read_msg_.body() + strlen(participant_name) + 2, "/TO", 3))
 				{
 					int i = 0;
-					for (char* c = read_msg_.body() + strlen(participant_name) + 5; *(c + 1) != ':'; ++c, ++i)
+					for (char* c = read_msg_.body() + strlen(participant_name) + 6; *c != ':'; ++c, ++i)
 					{
 						clientName[i] = *c;
 						clientName[i + 1] = '\0';
 					}
-					(findClient(clientName))->deliver(read_msg_);	// »щем клиента с нужным именем и отправл€ем только ему
-					do_read_header();
+					kr.encrypt(read_msg_.body());
+					if (findClient(clientName))
+					{
+						(findClient(clientName))->deliver(read_msg_);	// »щем клиента с нужным именем и отправл€ем только ему
+						do_read_header();
+					}
+					else 
+					{
+						std::memcpy(read_msg_.body(), "Client not found!\0", read_msg_.body_length());
+						(findClient(participant_name))->deliver(read_msg_);
+						do_read_header();
+					}
 				}
 				else
 				{
+					kr.encrypt(read_msg_.body());
 					room_.deliver(read_msg_);
 					do_read_header();
 				}
