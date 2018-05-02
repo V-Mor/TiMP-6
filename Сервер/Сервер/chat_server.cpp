@@ -126,6 +126,16 @@ private:
 		{
 			if (!ec)
 			{
+				if (!nameSpecified)			// Если имя не определено, задать имя
+				{
+					int i(0);
+					while ((read_msg_.body())[i] != ':')
+					{
+						participant_name[i] = (read_msg_.body())[i];
+						++i;
+					}
+					nameSpecified = true;
+				}
 				room_.deliver(read_msg_);
 				do_read_header();
 			}
@@ -159,6 +169,8 @@ private:
 		});
 	}
 
+	char participant_name[64];
+	bool nameSpecified = false;
 	tcp::socket socket_;
 	chat_room& room_;
 	chat_message read_msg_;
