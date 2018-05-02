@@ -17,6 +17,7 @@
 #include <set>
 #include <utility>
 #include <boost/asio.hpp>
+#include<string>
 #include "chat_message.hpp"
 
 using boost::asio::ip::tcp;
@@ -27,11 +28,43 @@ typedef std::deque<chat_message> chat_message_queue;
 
 //----------------------------------------------------------------------
 
+class Cryptor
+{
+	std::string key;
+public:
+	void encrypt(char* s)
+	{
+		int len = strlen(s);
+		for (int i = 0, a = 0; (a < len); ++s, ++a)
+		{
+			*s += key[i];
+			if (i == (key.size() - 1))
+				i = 0;
+			else
+				++i;
+		}
+	}
+	void decrypt(char* s)
+	{
+		int len = strlen(s);
+		for (int i = 0, a = 0; (a < len); ++s, ++a)
+		{
+			*s -= key[i];
+			if (i == (key.size() - 1))
+				i = 0;
+			else
+				++i;
+		}
+	}
+	Cryptor(std::string k) : key(k) {};
+};
+
 class chat_participant
 {
 public:
 	virtual ~chat_participant() {}
 	virtual void deliver(const chat_message& msg) = 0;
+	char participant_name[64];
 };
 
 typedef std::shared_ptr<chat_participant> chat_participant_ptr;
@@ -63,10 +96,26 @@ public:
 			participant->deliver(msg);
 	}
 
+	std::string getKey()
+	{
+		return key;
+	}
+
+	void setKey(std::string k)
+	{
+		key = k;
+	}
+
+	std::set<chat_participant_ptr> getParticipants()
+	{
+		return participants_;
+	}
+
 private:
 	std::set<chat_participant_ptr> participants_;
 	enum { max_recent_msgs = 100 };
 	chat_message_queue recent_msgs_;
+	std::string key;
 };
 
 //----------------------------------------------------------------------
@@ -99,6 +148,14 @@ public:
 	}
 
 private:
+
+	chat_participant_ptr findClient(const char* name)
+	{
+		for (auto client : room_.getParticipants())
+			if (!strcmp(((client.get())->participant_name), name))
+				return client;
+	}
+
 	void do_read_header()
 	{
 		auto self(shared_from_this());
@@ -128,12 +185,15 @@ private:
 			{
 				if (!nameSpecified)			// Если имя не определено, задать имя
 				{
+					Cryptor kr(room_.getKey());
+					kr.decrypt(read_msg_.body());
 					int i(0);
 					while ((read_msg_.body())[i] != ':')
 					{
 						participant_name[i] = (read_msg_.body())[i];
 						++i;
 					}
+					kr.encrypt(read_msg_.body());
 					nameSpecified = true;
 				}
 				room_.deliver(read_msg_);
@@ -169,7 +229,6 @@ private:
 		});
 	}
 
-	char participant_name[64];
 	bool nameSpecified = false;
 	tcp::socket socket_;
 	chat_room& room_;
@@ -183,10 +242,11 @@ class chat_server
 {
 public:
 	chat_server(boost::asio::io_service& io_service,
-		const tcp::endpoint& endpoint)
+		const tcp::endpoint& endpoint, std::string key)
 		: acceptor_(io_service, endpoint),
 		socket_(io_service)
 	{
+		room_.setKey(key);
 		do_accept();
 	}
 
@@ -227,8 +287,12 @@ int main(int argc, char* argv[])
 		std::list<chat_server> servers;
 		for (int i = 1; i < argc; ++i)
 		{
+			std::string key;
+			std::cout << "Enter keyword for chatroom #" << i << std::endl;
+			std::cout.flush();
+			std::getline(std::cin, key);
 			tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[i]));
-			servers.emplace_back(io_service, endpoint);
+			servers.emplace_back(io_service, endpoint, key);
 		}
 
 		io_service.run();
