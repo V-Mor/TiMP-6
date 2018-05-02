@@ -191,13 +191,32 @@ private:
 					while ((read_msg_.body())[i] != ':')
 					{
 						participant_name[i] = (read_msg_.body())[i];
+						participant_name[i + 1] = '\0';
 						++i;
 					}
 					kr.encrypt(read_msg_.body());
 					nameSpecified = true;
 				}
-				room_.deliver(read_msg_);
-				do_read_header();
+
+				char clientName[64];				// »м€ адресата
+				Cryptor kr(room_.getKey());
+				kr.decrypt(read_msg_.body());
+				if (!strncmp(read_msg_.body() + strlen(participant_name) + 2, "/TO", 3))
+				{
+					int i = 0;
+					for (char* c = read_msg_.body() + strlen(participant_name) + 5; *(c + 1) != ':'; ++c, ++i)
+					{
+						clientName[i] = *c;
+						clientName[i + 1] = '\0';
+					}
+					(findClient(clientName))->deliver(read_msg_);	// »щем клиента с нужным именем и отправл€ем только ему
+					do_read_header();
+				}
+				else
+				{
+					room_.deliver(read_msg_);
+					do_read_header();
+				}
 			}
 			else
 			{
