@@ -189,8 +189,6 @@ int main(int argc, char* argv[])
 
 		cr = new Cryptor(key);
 
-		//bool enteredChat = false; // Сообщает, выведено ли сообщение о том, что пользователь зашёл в чат
-
 		boost::asio::io_service io_service;
 
 		tcp::resolver resolver(io_service);
@@ -226,17 +224,6 @@ int main(int argc, char* argv[])
 			for (int i = 0; i < res_str.size(); ++i)
 				line[i] = res_str[i];
 			line[res_str.size()] = '\0';
-			/*if (!strcmp(line, (userName + ':' + ' ').c_str()) && !enteredChat)
-			{
-			res_str += "joined chat!";
-			for (int i = 0; i < res_str.size(); ++i)
-			line[i] = res_str[i];
-			line[res_str.size()] = '\0';
-			enteredChat = true;
-			}
-			else
-			if (!strcmp(line, (userName + ':' + ' ').c_str()) && enteredChat)
-			continue;*/
 
 			cr->encrypt(line);
 
